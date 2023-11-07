@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {name}
+  labels:
+    app: {name}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    external-dns.alpha.kubernetes.io/hostname: "{name}.{base_domain}"
+spec:
+  type: NodePort
+  selector:
+    app: {name}
+  ports:
+  - name: ssh
+    protocol: TCP
+    port: 22
+    targetPort: 22
