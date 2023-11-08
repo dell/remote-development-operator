@@ -24,7 +24,7 @@ spec:
       containers:
       - name: {name}
         image: {image}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         volumeMounts:
         - mountPath: /home/docker/code
           name: code

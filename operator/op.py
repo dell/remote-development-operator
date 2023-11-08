@@ -32,6 +32,7 @@ def create_fn(name, spec, namespace, logger, **kwargs):
     ssh_keys = "\n".join(spec["authorizedKeys"])
     pvc_size = spec["pvcSize"]
     base_domain = spec["baseDomain"]
+    excludedPaths = spec["excludedPaths"]
 
     # Create Service Account
     service_account_data = template_yaml("service-account.yaml", logger, name=name)
@@ -82,4 +83,13 @@ def create_fn(name, spec, namespace, logger, **kwargs):
         namespace=namespace, body=svc_data
     )
     logger.info("Created service.")
-    return {"ssh": f"docker@{name}.{base_domain}"}
+    ssh_uri = f"docker@{name}.{base_domain}"
+    base_repo_path = ''
+    exclude_args = ""
+    for exc in excludedPaths:
+        exclude_args += f"--exclude={exc} "
+    cmd = f"rsync -rlptzv --progress {exclude_args} `pwd`/{base_repo_path} {ssh_uri}:/home/docker/app"
+    return {
+        "ssh": ssh_uri,
+        "cmd": cmd
+    }

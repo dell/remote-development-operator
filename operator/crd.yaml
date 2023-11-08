@@ -30,6 +30,7 @@ spec:
               image:
                 type: string
                 description: The container image of the environment.
+                default: 702886132326.dkr.ecr.eu-west-1.amazonaws.com/devenv:latest
               authorizedKeys:
                 type: array
                 description: A list of SSH keys to authorize for SSH access to environment.
@@ -44,6 +45,38 @@ spec:
               baseDomain:
                 type: string
                 description: Base domain name under which subdomains will be created for every environment.
+                default: ''
+              mounts:
+                type: array
+                description: A list of labels that select specific Deployments or Statefulsets along with a path to mount the PVC that contains the code or binary.
+                default: []
+                items:
+                  type: object
+                  properties:
+                    kind:
+                      type: string
+                      description: The kind of target resource
+                      enum:
+                      - deployment
+                      - statefulset
+                    mountPath:
+                      type: string
+                      description: The path the PVC should be mounted on
+                    labels:
+                      type: object
+                      description: The labels that have been assigned to target Deployment or Statefulset
+                      additionalProperties:
+                        type: string
+              excludedPaths:
+                type: array
+                description: Code paths to be excluded from rsync
+                items:
+                  type: string
+                default:
+                - ".git"
+                - ".vscode"
+                - "__pycache__"
+                - ".pyc"
           status:
             type: object
             x-kubernetes-preserve-unknown-fields: true
