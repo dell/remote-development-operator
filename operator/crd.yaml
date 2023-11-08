@@ -45,7 +45,6 @@ spec:
               baseDomain:
                 type: string
                 description: Base domain name under which subdomains will be created for every environment.
-                default: ''
               mounts:
                 type: array
                 description: A list of labels that select specific Deployments or Statefulsets along with a path to mount the PVC that contains the code or binary.

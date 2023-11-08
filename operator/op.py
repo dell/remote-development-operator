@@ -5,6 +5,7 @@ import os
 import kopf
 import kubernetes
 import yaml
+import base64
 
 BASE_DIR = os.path.dirname(__file__)
 
@@ -33,6 +34,7 @@ def create_fn(name, spec, namespace, logger, **kwargs):
     pvc_size = spec["pvcSize"]
     base_domain = spec["baseDomain"]
     excludedPaths = spec["excludedPaths"]
+    mounts = base64.b64encode(yaml.dump(spec["mounts"]).encode('utf-8')).decode()
 
     # Create Service Account
     service_account_data = template_yaml("service-account.yaml", logger, name=name)
@@ -68,7 +70,8 @@ def create_fn(name, spec, namespace, logger, **kwargs):
 
     # Create deployment
     dpl_data = template_yaml(
-        "deployment.yaml", logger, name=name, image=image, ssh_keys=ssh_keys
+        "deployment.yaml", logger, name=name, image=image, ssh_keys=ssh_keys,
+        mounts=mounts
     )
     kopf.adopt(dpl_data)
     kubernetes.client.AppsV1Api().create_namespaced_deployment(

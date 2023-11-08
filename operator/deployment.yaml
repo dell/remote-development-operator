@@ -37,6 +37,8 @@ spec:
         env:
         - name: authorized_keys
           value: {ssh_keys!r}
+        - name: mounts
+          value: "{mounts}"
         resources:
           requests:
             memory: 64Mi
