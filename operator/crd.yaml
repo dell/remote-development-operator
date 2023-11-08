@@ -10,7 +10,7 @@ spec:
     plural: devenvs
     singular: devenv
     shortNames:
-    - ddevenv
+    - devenv
     - de
   versions:
   - name: v1
@@ -45,6 +45,10 @@ spec:
               baseDomain:
                 type: string
                 description: Base domain name under which subdomains will be created for every environment.
+              mounted:
+                type: boolean
+              synced:
+                type: boolean
           status:
             type: object
             x-kubernetes-preserve-unknown-fields: true

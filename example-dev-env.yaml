@@ -8,3 +8,12 @@ spec:
   - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDfWoXI0hLmcXyhsVFK2/aXexksCh3pZO/F9kZD/JmwA6iNHRzaNZ4/ZWIwcLkOgvxai1EfgIsJgHmWuejQTF/zsunUwZ/iMoYHwxleFop7/xjUfoFDBa0Xmh//AC6n6HcOtSvWIfkqIQY5d/71sIoT9q6mbQHXliR96151IiN29TlF0Iw9fCreCilahIfs8sbnwN8B6z0SikUtlvBa/TinrsDHwJSOWp77u2He8EmEWBIGDZsxqWL1KgJW/i/keaRKC1f7i1wFcajxa99/8oTOE858LPrIsyFmpBSm/T8Zjd9lhpWQiezGszrU+IvCE9Mg3ysWq93k5c9m7vqd2fsCAZ6ljivWW+sH6M7Z3qadaoCvo+wPohzQwYCuxNb1GzVA5W14hJ7pdbOVAnBYsCExOuO64kKcYPEJwwQORLTVLlwi9OcSEtgkzl0Pwe9YY9WQXD6ZGbnbwyEoOI+P4pG6S4jai/OAlpkpNwUNH1tsypbmaUK6NVpy3HulUzjHfwp2L/wa/bBmhWtH7cB3mInyfslh5WLBQmHJrNpizvJb99BG0ptHyNYwE0WlUVinAoDA+gv66/tvizt/2qxb5IrZPIGgXLTsjiavU6KT8cpFmmdMF1mC5wup4w/mZtzOC/JcaVonq8EvSaO4RbRXv6D6ARMS0TGtu2k9ZMYACaGQbw== europe\dimitrios_rozakis@W103ZQX1T3
   - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDHQmB0e8oCHeQYS4o/M4euoN32DdnbV2GwJVNgntWzQTxtxeOB5VUz4WJxiiCKbx7uvcbWbBz2EQpDLNdS/CDS2bb2jBiRada+9spGJExDTmVWYYwzHbOcudKp/ZCNAP84up2t67WwYEgqLwS26XjB+qT1iM7MRkgnaMCh69yQQ4Y+fitW/BjeWcZLLvcrN+c086AbOg7zRR6J1TGXKav69pMiHVQi/nsmOKrgtix/qZ80/xGSlrjn8spZDWeT0kyxptC45wpWvMfsNtrrvmPNnmdEIvqgPZyFFWdV4LICZ5YIRR1Dwck4FwpbHCinO2eZZ/1zvbzlsnGwVp1dCO5dyWQonHXIzstiLpqrttSFGjn6SWGmtMgnjz1IAQwkM8XZ9sDx5I91fzPFPecSCtFH07E9rbdE6HEh6okm65jBnWaCMGoaokSpE/qPbZijBmR4QsCRAYcuJhPQJunLQ9BScKFj0KqoVg8Vy3XRKAzhUIi95P2u1FnrV7V9VcvO2Uc= dimo@W118CD8HW3
   baseDomain: dev.nativeedge.dell.com
+  mounts:
+  - kind: deployment
+    mountPath: /mist
+    labels:
+      app: api-v2
+  - kind: deployment
+    mountPath: /mist
+    labels:
+      app: dramatiq-dramatiq
