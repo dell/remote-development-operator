@@ -33,6 +33,30 @@ def create_fn(name, spec, namespace, logger, **kwargs):
     pvc_size = spec["pvcSize"]
     base_domain = spec["baseDomain"]
 
+    # Create Service Account
+    service_account_data = template_yaml("service-account.yaml", logger, name=name)
+    kopf.adopt(service_account_data)
+    kubernetes.client.CoreV1Api().create_namespaced_service_account(
+        namespace=namespace, body=service_account_data
+    )
+    logger.info("Created Service Account.")
+
+    # Create Role
+    role_data = template_yaml("role.yaml", logger, name=name)
+    kopf.adopt(role_data)
+    kubernetes.client.RbacAuthorizationV1Api().create_namespaced_role(
+        namespace=namespace, body=role_data
+    )
+    logger.info("Created Cluster Role.")
+
+    # Create Role Binding
+    role_binding_data = template_yaml("role-binding.yaml", logger, name=name)
+    kopf.adopt(role_binding_data)
+    kubernetes.client.RbacAuthorizationV1Api().create_namespaced_role_binding(
+        namespace=namespace, body=role_binding_data
+    )
+    logger.info("Created Cluster Role Binding.")
+
     # Create PVC
     pvc_data = template_yaml("pvc.yaml", logger, name=name, size=pvc_size)
     kopf.adopt(pvc_data)
@@ -41,15 +65,15 @@ def create_fn(name, spec, namespace, logger, **kwargs):
     )
     logger.info("Created PVC.")
 
-    # Create pod
-    pod_data = template_yaml(
-        "pod.yaml", logger, name=name, image=image, ssh_keys=ssh_keys
+    # Create deployment
+    dpl_data = template_yaml(
+        "deployment.yaml", logger, name=name, image=image, ssh_keys=ssh_keys
     )
-    kopf.adopt(pod_data)
-    kubernetes.client.CoreV1Api().create_namespaced_pod(
-        namespace=namespace, body=pod_data
+    kopf.adopt(dpl_data)
+    kubernetes.client.AppsV1Api().create_namespaced_deployment(
+        namespace=namespace, body=dpl_data
     )
-    logger.info("Created pod.")
+    logger.info("Created deployment.")
 
     # Create service
     svc_data = template_yaml("svc.yaml", logger, name=name, base_domain=base_domain)

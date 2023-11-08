@@ -29,8 +29,7 @@ spec:
             properties:
               image:
                 type: string
-                description: The container image of the environment
-
+                description: The container image of the environment.
               authorizedKeys:
                 type: array
                 description: A list of SSH keys to authorize for SSH access to environment.
@@ -45,10 +44,6 @@ spec:
               baseDomain:
                 type: string
                 description: Base domain name under which subdomains will be created for every environment.
-              mounted:
-                type: boolean
-              synced:
-                type: boolean
           status:
             type: object
             x-kubernetes-preserve-unknown-fields: true
