@@ -1,6 +1,6 @@
-FROM ubuntu:latest
-
+FROM python:3-bullseye
 ENV USER=docker
+RUN useradd -ms /bin/bash $USER
 ENV HOME /home/$USER
 USER root
 # RUN adduser $USER
@@ -14,7 +14,7 @@ RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s 
 RUN ssh-keygen -A && mkdir -p /run/sshd
 RUN usermod -aG sudo $USER && echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && touch /home/$USER/.sudo_as_admin_successful
 RUN echo "$USER:$USER" |chpasswd
-RUN rm $HOME/.ssh && mkdir $HOME/.ssh/ $HOME/scripts
+RUN mkdir $HOME/.ssh/ $HOME/scripts
 RUN chown -R $USER:$USER $HOME/.ssh
 COPY run.sh /
 COPY scripts/ $HOME/scripts
