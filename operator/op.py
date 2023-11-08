@@ -23,7 +23,7 @@ def template_yaml(filename, logger, **kwargs):
     return data
 
 
-@kopf.on.create("dell.com", "v1", "hybriddevenvs")
+@kopf.on.create("dell.com", "v1", "devenvs")
 def create_fn(name, spec, namespace, logger, **kwargs):
     del kwargs
 

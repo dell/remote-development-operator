@@ -1,17 +1,17 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: hybriddevenvs.dell.com
+  name: devenvs.dell.com
 spec:
   scope: Namespaced
   group: dell.com
   names:
-    kind: HybridDevEnv
-    plural: hybriddevenvs
-    singular: hybriddevenv
+    kind: DevEnv
+    plural: devenvs
+    singular: devenv
     shortNames:
-    - hybriddevenv
-    - hde
+    - ddevenv
+    - de
   versions:
   - name: v1
     served: true
@@ -30,6 +30,7 @@ spec:
               image:
                 type: string
                 description: The container image of the environment
+
               authorizedKeys:
                 type: array
                 description: A list of SSH keys to authorize for SSH access to environment.
