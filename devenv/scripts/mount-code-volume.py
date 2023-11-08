@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-import os
 import argparse
+import os
 import subprocess
-from typing import Dict, Literal
+from typing import Literal
 
 import yaml
 
@@ -23,14 +23,14 @@ def parse_args():
     argparser.add_argument(
         "-n",
         "--namespace",
-        default="hzp",
+        default="default",
         required=False,
         help="Kubernetes namespace of all objects that will be modified.",
     )
     argparser.add_argument(
         "-l",
         "--labels",
-        default='',
+        default="",
         required=False,
         help=(
             "Labels common to all kubernetes objects that will be manified. "
@@ -48,7 +48,7 @@ def parse_args():
     argparser.add_argument("pvc_name", help="Name of PVC to mount.")
     args = argparser.parse_args()
     if args.labels:
-        args.labels = dict(l.split("=", 1) for l in args.labels.split(","))
+        args.labels = dict(lbl.split("=", 1) for lbl in args.labels.split(","))
     else:
         args.labels = {}
     return args
@@ -68,7 +68,7 @@ def load_config(path: str) -> dict:
 
 
 def get_manifest(
-    namespace: str, kind: Literal["deployment", "statefulset"], labels: Dict[str, str]
+    namespace: str, kind: Literal["deployment", "statefulset"], labels: dict[str, str]
 ) -> dict:
     labels_str = ",".join("=".join((key, val)) for key, val in labels.items())
     cmd = ["kubectl", "-n", namespace, "get", kind, "-l", labels_str, "-o", "yaml"]
@@ -113,7 +113,6 @@ def add_mount(
             if mount["name"] == volume_name:
                 # Update existing volume mount.
                 mount["mountPath"] = mount_path
-                # mount["readWriteMany"] = True
                 if sub_path:
                     mount["subPath"] = sub_path
                 else:
