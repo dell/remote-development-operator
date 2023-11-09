@@ -1,2 +1,2 @@
 kopf
-kubernetes
+pyyaml

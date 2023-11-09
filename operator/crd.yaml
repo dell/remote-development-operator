@@ -26,6 +26,8 @@ spec:
             - image
             - authorizedKeys
             - baseDomain
+            - mountsEnabled
+            - mounts
             properties:
               image:
                 type: string
@@ -45,30 +47,46 @@ spec:
               baseDomain:
                 type: string
                 description: Base domain name under which subdomains will be created for every environment.
+              mountsEnabled:
+                type: boolean
+                description: Globally enable/disable all mounts under `mounts`.
+                default: false
               mounts:
                 type: array
                 description: A list of labels that select specific Deployments or Statefulsets along with a path to mount the PVC that contains the code or binary.
-                default: []
+                default: []  # why
                 items:
                   type: object
+                  required:
+                  - kind
+                  - mountPath
+                  - labels
+                  - mounted
                   properties:
                     kind:
                       type: string
-                      description: The kind of target resource
+                      description: The kind of target resource.
                       enum:
                       - deployment
-                      - statefulset
+                      # - statefulset
                     mountPath:
                       type: string
-                      description: The path the PVC should be mounted on
+                      description: The path the PVC should be mounted on.
+                    subPath:
+                      type: string
+                      description: The subpath inside the PVC that should be mounted to the mountPath.
                     labels:
                       type: object
-                      description: The labels that have been assigned to target Deployment or Statefulset
+                      description: The labels that have been assigned to target Deployment or Statefulset.
                       additionalProperties:
                         type: string
+                    mounted:
+                      type: boolean
+                      description: Whether the volume should actually be mounted.
+                      default: true
               excludedPaths:
                 type: array
-                description: Code paths to be excluded from rsync
+                description: Code paths to be excluded from rsync.
                 items:
                   type: string
                 default:

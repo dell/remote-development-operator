@@ -17,6 +17,7 @@ spec:
         app: {name}
     spec:
       serviceAccountName: {name}
+      terminationGracePeriodSeconds: 5
       volumes:
       - name: code
         persistentVolumeClaim:
@@ -28,8 +29,6 @@ spec:
         volumeMounts:
         - mountPath: /home/docker/code
           name: code
-          securityContext:
-            fsGroup: 1000
         ports:
         - name: ssh
           containerPort: 22
@@ -39,6 +38,12 @@ spec:
           value: {ssh_keys!r}
         - name: mounts
           value: "{mounts}"
+        - name: envname
+          value: {name}
+        - name: namespace
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         resources:
           requests:
             memory: 64Mi

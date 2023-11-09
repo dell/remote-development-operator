@@ -23,7 +23,7 @@ def parse_args():
     argparser.add_argument(
         "-n",
         "--namespace",
-        default="default",
+        default=os.getenv("namespace", "default"),
         required=False,
         help="Kubernetes namespace of all objects that will be modified.",
     )
