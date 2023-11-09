@@ -53,7 +53,7 @@ def create_update_dev_env(name, spec, namespace, logger, **kwargs):
     ssh_uri = f"docker@{name}.{base_domain}"
     base_repo_path = ""
     exclude_args = " ".join(f"--exclude={exc}" for exc in excluded_paths)
-    cmd = f"rsync -rlptzv --progress {exclude_args} `pwd`/{base_repo_path} {ssh_uri}:/home/docker/app"  # NOQA: E501
+    cmd = f"echo 'Starting rsync' && rsync -rlptzv --progress {exclude_args} `pwd`/{base_repo_path} {ssh_uri}:/home/docker/code && echo Reloading services && ssh {ssh_uri} -- './scripts/hup.sh' && echo Done"  # NOQA: E501
     return {"ssh": ssh_uri, "cmd": cmd}
 
 

@@ -16,6 +16,11 @@ spec:
   - name: v1
     served: true
     storage: true
+    additionalPrinterColumns:
+    - name: SSH URI
+      type: string
+      description: The SSH URI of the DevEnv
+      jsonPath: .status.create_update_dev_env.ssh
     schema:
       openAPIV3Schema:
         type: object
