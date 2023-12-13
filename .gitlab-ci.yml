@@ -1,0 +1,56 @@
+include:
+  - project: frontier/mist/gitlab-ci-templates
+    file: docker-build.yml
+    ref: main
+
+variables:
+  # Variables with descriptions so that a nice form is generated in the Gitlab UI
+  # when a pipeline gets triggered.
+  DEVENV_NAME:
+    description: Name of the DevEnv that will be created.
+    value: $CI_COMMIT_REF_SLUG
+  EO_ENV:
+    description: Name of the EO deployment that will be targeted
+  SELECTORS:
+    description: Labels of target EO services to develop for
+
+  # Remaining variables that will not be rendered in the Gitlab manual pipeline form.
+  AWS_DEFAULT_REGION: eu-west-1
+  EKS_CLUSTER_NAME: dell-eks-dev
+  NAMESPACE: hzp
+  FQDN: $ENV_NAME.dev.nativeedge.dell.com
+  ARTIFACTORY_REGISTRY: amaas-eos-mw1.cec.lab.emc.com:5070
+  ECR_REGISTRY: 702886132326.dkr.ecr.eu-west-1.amazonaws.com/eo-images
+  OPERATOR_IMAGE: $ARTIFACTORY_REGISTRY/remote-development-operator
+  DEVENV_IMAGE: $ARTIFACTORY_REGISTRY/remote-development-environment
+
+
+# The stages are not really being used because all jobs define explicit dependencies
+# with `needs` (DAG pipeline).
+stages:
+- prepare
+
+
+# Builds the Dockerfile present in this repo. The image will be used by subsequent jobs.
+build operator image:
+  extends: .docker_build  # from included template
+  stage: prepare
+  variables:
+    GIT_STRATEGY: clone
+    EXT_REGISTRY: $ARTIFACTORY_REGISTRY
+    EXT_REGISTRY_USER: $ARTIFACTORY_DOCKER_PUSH_USER  # Taken from project settings
+    EXT_REGISTRY_PASSWORD: $ARTIFACTORY_DOCKER_PUSH_PASSWORD  # Taken from project settings
+    EXT_REGISTRY_IMAGE: $OPERATOR_IMAGE
+  script: docker_simple_build_and_push
+
+# Builds the Dockerfile present in this repo. The image will be used by subsequent jobs.
+build devenv image:
+  extends: .docker_build  # from included template
+  stage: prepare
+  variables:
+    GIT_STRATEGY: clone
+    EXT_REGISTRY: $ARTIFACTORY_REGISTRY
+    EXT_REGISTRY_USER: $ARTIFACTORY_DOCKER_PUSH_USER  # Taken from project settings
+    EXT_REGISTRY_PASSWORD: $ARTIFACTORY_DOCKER_PUSH_PASSWORD  # Taken from project settings
+    EXT_REGISTRY_IMAGE: $DEVENV_IMAGE
+  script: docker_simple_build_and_push devenv

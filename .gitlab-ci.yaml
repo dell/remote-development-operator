@@ -1,0 +1,98 @@
+include:
+  - project: frontier/mist/gitlab-ci-templates
+    file: docker-build.yml
+    ref: main
+
+variables:
+  # Variables with descriptions so that a nice form is generated in the Gitlab UI
+  # when a pipeline gets triggered.
+  DEVENV_NAME:
+    description: Name of the DevEnv that will be created.
+    value: $CI_COMMIT_REF_SLUG
+  EO_ENV:
+    description: Name of the EO deployment that will be targeted
+  SELECTORS:
+    description: Labels of target EO services to develop for
+
+  # Remaining variables that will not be rendered in the Gitlab manual pipeline form.
+  AWS_DEFAULT_REGION: eu-west-1
+  EKS_CLUSTER_NAME: dell-eks-dev
+  NAMESPACE: hzp
+  FQDN: $ENV_NAME.dev.nativeedge.dell.com
+  ARTIFACTORY_REGISTRY: amaas-eos-mw1.cec.lab.emc.com:5070
+  ECR_REGISTRY: 702886132326.dkr.ecr.eu-west-1.amazonaws.com/eo-images
+  OPERATOR_IMAGE: $ARTIFACTORY_REGISTRY/remote-development-operator
+  DEVENV_IMAGE: $ARTIFACTORY_REGISTRY/remote-development-environment
+
+
+# The stages are not really being used because all jobs define explicit dependencies
+# with `needs` (DAG pipeline).
+stages:
+- prepare
+
+
+# Builds the Dockerfile present in this repo. The image will be used by subsequent jobs.
+build operator image:
+  extends: .docker_build  # from included template
+  stage: prepare
+  variables:
+    GIT_STRATEGY: clone
+    EXT_REGISTRY: $ARTIFACTORY_REGISTRY
+    EXT_REGISTRY_USER: $ARTIFACTORY_DOCKER_PUSH_USER  # Taken from project settings
+    EXT_REGISTRY_PASSWORD: $ARTIFACTORY_DOCKER_PUSH_PASSWORD  # Taken from project settings
+    EXT_REGISTRY_IMAGE: $OPERATOR_IMAGE
+  script: docker_simple_build_and_push
+
+# Builds the Dockerfile present in this repo. The image will be used by subsequent jobs.
+build devenv image:
+  extends: .docker_build  # from included template
+  stage: prepare
+  variables:
+    GIT_STRATEGY: clone
+    EXT_REGISTRY: $ARTIFACTORY_REGISTRY
+    EXT_REGISTRY_USER: $ARTIFACTORY_DOCKER_PUSH_USER  # Taken from project settings
+    EXT_REGISTRY_PASSWORD: $ARTIFACTORY_DOCKER_PUSH_PASSWORD  # Taken from project settings
+    EXT_REGISTRY_IMAGE: $DEVENV_IMAGE
+  script: docker_simple_build_and_push devenv
+
+# Base job template. Uses image built in above job. Is configured to access all necessary resources.
+.base:
+  image: $CI_IMAGE:$CI_COMMIT_SHA  # Image built in 'build ci image' job.
+  variables:
+    GIT_STRATEGY: none
+  before_script:
+  # Check configuration of proxied hosts by host VM loopback IP addresses.
+  - cat /etc/hosts
+  # Add Dell CA certificate.
+  - |-
+    # Adding Dell CA certificate.
+    curl -fsSL --output /usr/local/share/ca-certificates/dellca2018-bundle.crt \
+      http://ecs-artifacts.cec.lab.emc.com/ovf/git/Dell2018/dellca2018-bundle.crt && \
+    update-ca-certificates
+  # Authenticate to Dell Github for git operations.
+  - git config --global url.https://${GITHUB_DELL_USER}:${GITHUB_DELL_TOKEN}@eos2git.cec.lab.emc.com.insteadOf https://eos2git.cec.lab.emc.com
+  - git config --global url.https://${GITHUB_DELL_USER}:${GITHUB_DELL_TOKEN}@eos2git.cec.lab.emc.com/.insteadOf "git@eos2git.cec.lab.emc.com:"
+  # Authenticate to Dell Gitlab for git operations.
+  - git config --global url.https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.dell.com.insteadOf https://gitlab.dell.com
+  - git config --global url.https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.dell.com/.insteadOf "git@gitlab.dell.com:"
+  # Assume AWS role.
+  - |-
+    # Assume AWS role if applicable.
+    if [ -n "AWS_ROLE_ARN" ]; then
+      echo "Will assume AWS role $AWS_ROLE_ARN."
+      creds=$(aws sts assume-role --role-arn $AWS_ROLE_ARN --role-session-name GitlabCI)
+      export AWS_ACCESS_KEY_ID=$(echo "$creds" | jq -r '.Credentials.AccessKeyId')
+      export AWS_SECRET_ACCESS_KEY=$(echo "$creds" | jq -r '.Credentials.SecretAccessKey')
+      export AWS_SESSION_TOKEN=$(echo "$creds" | jq -r '.Credentials.SessionToken')
+    else
+      echo "No AWS_ROLE_ARN set, will not assume role."
+    fi
+    echo "Configured AWS identity:"
+    aws sts get-caller-identity --output yaml
+  # Configure kubectl.
+  - aws eks update-kubeconfig --name $EKS_CLUSTER_NAME
+  needs:
+  - build operator image  # Because it uses the image built in that job.
+  - build devenv image  # Because it uses the image built in that job.
+  tags:
+  - aws  # run in dedicated runner in AWS with limited and proxied access to Dell resources.
