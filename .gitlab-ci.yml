@@ -30,6 +30,11 @@ variables:
   OPERATOR_IMAGE_NAME: remote-development-operator
   DEVENV_IMAGE_NAME: remote-development-environment
   NAMESPACE: hzp
+  AWS_DEFAULT_REGION: eu-west-1
+  EKS_CLUSTER_NAME: dell-eks-dev
+  FQDN: $ENV_NAME.dev.nativeedge.dell.com
+  ARTIFACTORY_REGISTRY: amaas-eos-mw1.cec.lab.emc.com:5070
+  ECR_REGISTRY: 702886132326.dkr.ecr.eu-west-1.amazonaws.com/eo-images
 
 
 # The stages are not really being used because all jobs define explicit dependencies
