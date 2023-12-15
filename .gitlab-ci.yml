@@ -1,0 +1,86 @@
+include:
+- project: frontier/mist/gitlab-ci-templates
+  file: pre-commit.yml
+  ref: main
+- project: frontier/mist/gitlab-ci-templates
+  file: docker-build.yml
+  ref: main
+# Defines .base job template.
+- project: frontier/cloud-hosted-beta/eoaas-deployment-pipeline
+  file: .gitlab-ci.base.yml
+  ref: main
+# Defines .crane and .crane-copy-multi-image templates.
+- project: frontier/cloud-hosted-beta/eoaas-deployment-pipeline
+  file: .gitlab-ci.crane.yml
+  ref: main
+
+
+variables:
+  # Variables with descriptions so that a nice form is generated in the Gitlab UI
+  # when a pipeline gets triggered.
+  DEVENV_NAME:
+    description: Name of the DevEnv that will be created.
+    value: $CI_COMMIT_REF_SLUG
+  EO_ENV:
+    description: Name of the EO deployment that will be targeted
+  SELECTORS:
+    description: Labels of target EO services to develop for
+
+  # Remaining variables that will not be rendered in the Gitlab manual pipeline form.
+  OPERATOR_IMAGE_NAME: remote-development-operator
+  DEVENV_IMAGE_NAME: remote-development-environment
+  NAMESPACE: hzp
+
+
+# The stages are not really being used because all jobs define explicit dependencies
+# with `needs` (DAG pipeline).
+stages:
+- test
+- build
+- publish
+- deploy
+
+
+# Build docker images.
+build operator image:
+  extends: .docker_build  # from included template
+  stage: build
+  variables:
+    EXT_REGISTRY: $ARTIFACTORY_REGISTRY
+    EXT_REGISTRY_USER: $ARTIFACTORY_DOCKER_PUSH_USER  # Taken from project settings
+    EXT_REGISTRY_PASSWORD: $ARTIFACTORY_DOCKER_PUSH_PASSWORD  # Taken from project settings
+    EXT_REGISTRY_IMAGE: $ARTIFACTORY_REGISTRY/$OPERATOR_IMAGE_NAME
+  script: docker_simple_build_and_push
+  needs: []
+build devenv image:
+  extends: build operator image
+  variables:
+    EXT_REGISTRY_IMAGE: $ARTIFACTORY_REGISTRY/$DEVENV_IMAGE_NAME
+  script: docker_simple_build_and_push devenv
+
+# Publish docker images to ECR.
+publish operator image to ECR:
+  extends: .crane
+  stage: publish
+  script: copy_image $OPERATOR_IMAGE_NAME:$CI_COMMIT_SHA
+  needs: [build operator image]
+publish devenv image to ECR:
+  extends: .crane
+  stage: publish
+  script: copy_image $DEVENV_IMAGE_NAME:$CI_COMMIT_SHA
+  needs: [build devenv image]
+
+# Deploy devenv.
+deploy:
+  extends: .base
+  stage: deploy
+  script:
+  - echo "Example of deploy action"
+  - kubectl -n $NAMESPACE get pod
+  - echo "Not implemented!"
+  - exit 42
+  allow_failure:
+    exit_codes: 42  # Failed due to not-implemented instead of due to misconfiguration.
+  needs:
+  - publish operator image to ECR
+  - publish devenv image to ECR
