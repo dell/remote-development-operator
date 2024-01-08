@@ -1,4 +1,4 @@
-FROM python:3-bullseye
+FROM amaas-eos-mw1.cec.lab.emc.com:5070/python:3-bullseye
 ENV USER=docker
 RUN useradd -ms /bin/bash $USER
 ENV HOME /home/$USER

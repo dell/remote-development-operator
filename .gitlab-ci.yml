@@ -7,11 +7,11 @@ include:
   ref: main
 # Defines .base job template.
 - project: frontier/cloud-hosted-beta/eoaas-deployment-pipeline
-  file: .gitlab-ci.base.yml
+  file: gitlab-ci-templates/base.gitlab-ci.yml
   ref: main
 # Defines .crane and .crane-copy-multi-image templates.
 - project: frontier/cloud-hosted-beta/eoaas-deployment-pipeline
-  file: .gitlab-ci.crane.yml
+  file: gitlab-ci-templates/crane.gitlab-ci.yml
   ref: main
 
 

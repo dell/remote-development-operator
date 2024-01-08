@@ -1,4 +1,4 @@
-FROM python:3.11-slim-bookworm
+FROM amaas-eos-mw1.cec.lab.emc.com:5070/python:3.11-slim-bookworm
 
 # Install kubectl.
 RUN set -x && \
