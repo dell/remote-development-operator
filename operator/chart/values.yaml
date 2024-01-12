@@ -1,0 +1,3 @@
+image:
+  repository: 702886132326.dkr.ecr.eu-west-1.amazonaws.com/eo-images-gitlab/remote-development-operator
+  tag: main

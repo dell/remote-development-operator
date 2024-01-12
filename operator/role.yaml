@@ -5,6 +5,7 @@ metadata:
   labels:
     app: {name}
 rules:
+# TODO: Restrict permissions
 - apiGroups: ["*"]
   resources: ["*"]
   verbs: ["*"]

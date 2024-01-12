@@ -28,6 +28,7 @@ repos:
 
   # Check syntax
   - id: check-yaml
+    args: [--unsafe]
   # - id: check-json
   #- id: check-toml
   #- id: check-xml

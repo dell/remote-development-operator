@@ -1,3 +1,11 @@
+workflow:
+  rules:
+  # Disable MR pipelines.
+  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    when: never
+  # Fallback rule allows all other pipelines.
+  - when: always
+
 include:
 - project: frontier/mist/gitlab-ci-templates
   file: pre-commit.yml
@@ -14,22 +22,31 @@ include:
   file: gitlab-ci-templates/crane.gitlab-ci.yml
   ref: main
 
-
 variables:
   # Variables with descriptions so that a nice form is generated in the Gitlab UI
   # when a pipeline gets triggered.
   DEVENV_NAME:
     description: Name of the DevEnv that will be created.
-    value: $CI_COMMIT_REF_SLUG
   EO_ENV:
     description: Name of the EO deployment that will be targeted
+    value: scheduled-test-env
+  NAMESPACE:
+    description: Namespace where to deploy the DevEnv and look for the target services
+    value: hzp
   SELECTORS:
     description: Labels of target EO services to develop for
+    value: app=api-v2
+  MOUNT_PATH:
+    description: The path in the target pod were the code will be mounted at
+    value: "/mist"
+  EXCLUDED:
+    description: Excluded paths
+    value: '[".git", ".vscode", "__pycache__", ".pyc", "/landing", "/portal", "/jenkins", "/settings", "/ui", "/tests", "/docker/nginx/static"]'
 
   # Remaining variables that will not be rendered in the Gitlab manual pipeline form.
   OPERATOR_IMAGE_NAME: remote-development-operator
   DEVENV_IMAGE_NAME: remote-development-environment
-  NAMESPACE: hzp
+  BASE_DOMAIN: dev.nativeedge.dell.com
 
 
 # The stages are not really being used because all jobs define explicit dependencies
@@ -38,7 +55,9 @@ stages:
 - test
 - build
 - publish
-- deploy
+- deploy operator
+- deploy devenv
+- undeploy
 
 
 # Build docker images.
@@ -64,23 +83,103 @@ publish operator image to ECR:
   stage: publish
   script: copy_image $OPERATOR_IMAGE_NAME:$CI_COMMIT_SHA
   needs: [build operator image]
+
 publish devenv image to ECR:
   extends: .crane
   stage: publish
   script: copy_image $DEVENV_IMAGE_NAME:$CI_COMMIT_SHA
   needs: [build devenv image]
 
-# Deploy devenv.
-deploy:
+# Deploy operator.
+deploy operator:
   extends: .base
-  stage: deploy
+  variables:
+    GIT_STRATEGY: fetch
+  stage: deploy operator
   script:
-  - echo "Example of deploy action"
-  - kubectl -n $NAMESPACE get pod
-  - echo "Not implemented!"
-  - exit 42
-  allow_failure:
-    exit_codes: 42  # Failed due to not-implemented instead of due to misconfiguration.
+  - |-
+    if [ -z "$EO_ENV" ]; then
+      echo "Deploying operator on host cluster"
+    else
+      echo "Deploying operator inside $EO_ENV vcluster"
+      vcluster connect $EO_ENV
+      sleep 5
+    fi
+    kubectl cluster-info
+    kubectl apply -f https://github.com/nolar/kopf/raw/main/peering.yaml || kubectl apply -f https://github.com/nolar/kopf/raw/main/peering.yaml # Retry needed sometimes
+    kubectl wait --for condition=established --timeout=60s CustomResourceDefinition/kopfpeerings.kopf.dev
+    kubectl apply -f operator/crd.yaml
+    helm upgrade --install --namespace $NAMESPACE \
+      --set image.tag="$CI_COMMIT_SHA" \
+      --wait --timeout=2m \
+      remote-development-operator operator/chart
   needs:
   - publish operator image to ECR
   - publish devenv image to ECR
+
+# Deploy operator.
+deploy devenv:
+  extends: .base
+  variables:
+    GIT_STRATEGY: fetch
+  stage: deploy devenv
+  environment:
+    name: $DEVENV_NAME
+  needs:
+  - deploy operator
+  rules:
+    - if: $DEVENV_NAME == ""
+      when: manual
+    - when: always
+  script:
+  - |-
+    echo "Deploying DevEnv"
+    vcluster connect $EO_ENV
+    echo "Connected to vcluster"
+    kubectl cluster-info
+    echo "Excluded:" $EXCLUDED
+    echo "Mount path:" $MOUNT_PATH
+    echo "Selectors:" $SELECTORS
+    curl https://gitlab.dell.com/$GITLAB_USER_LOGIN.keys > user.keys
+    export GITHUB_USER_LOGIN=$(echo $GITLAB_USER_LOGIN|tr '_' '-')
+    curl -L -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GITHUB_DELL_TOKEN}" https://eos2git.cec.lab.emc.com/api/v3/users/$GITHUB_USER_LOGIN/keys | jq -r '.[].key' >> user.keys
+    export SSH_PUB_KEYS=$(sed 's/^/  - /g' user.keys|sed '1i\\')
+    export BASE_IMAGE=702886132326.dkr.ecr.eu-west-1.amazonaws.com/eo-images-gitlab/remote-development-environment
+    export LABELS=$(echo $SELECTORS |sed -r 's/=/:\ /g'|sed -r 's/,/\n/g'|sed -r 's/^/      /g'|sed '1i\\')
+    export IMAGE=$BASE_IMAGE:$CI_COMMIT_SHA
+    if [ -z "$DEVENV_NAME" ]; then export DEVENV_NAME=$(echo "$GITHUB_USER_LOGIN-dev-env" | tr '[:upper:]' '[:lower:]'); fi
+    cat example-dev-env.yaml | envsubst > dev-env.yaml
+    cat dev-env.yaml
+    kubectl apply -f dev-env.yaml
+    echo
+    echo
+    echo "You can configure your local IDE to synchronize your local code over SSH. If using vscode/vscodium/code-server, please install the \`emeraldwalk.runonsave\` extension and put the following contents inside \`.vscode/settings.json\` within your project"
+    export CMD=$(kubectl get devenv -n $NAMESPACE $DEVENV_NAME -o json | jq ".status.create_update_dev_env.cmd")
+    cat << EOF
+    {
+    "emeraldwalk.runonsave": {
+        "commands": [
+            {
+                "match": ".*",
+                "isAsync": true,
+                "cmd": "$CMD"
+            }
+        ]
+      }
+    }
+    EOF
+    echo
+    echo "Waiting for DNS to propagate and for SSH to be up..."
+    export SSH_HOST="$DEVENV_NAME.$BASE_DOMAIN"
+    while ! $(nc -z "$SSH_HOST" 22 2> /dev/null); do
+      sleep 1 # wait for 1 second before check again
+    done
+    echo "SSH server is ready. Connect using \`ssh docker@$DEVENV_NAME.$BASE_DOMAIN\`"
+
+undeploy:
+  extends: .base
+  when: manual
+  stage: undeploy
+  script:
+  - kubectl delete devenv example-dev-env
+  - helm delete -n $NAMESPACE remote-development-operator

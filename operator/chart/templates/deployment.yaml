@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: remote-development-operator
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      application: remote-development-operator
+  template:
+    metadata:
+      labels:
+        application: remote-development-operator
+    spec:
+      serviceAccountName: remote-dev-operator-account
+      containers:
+      - name: operator
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
