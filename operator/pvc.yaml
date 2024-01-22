@@ -5,8 +5,9 @@ metadata:
   labels:
     app: {name}
 spec:
+  storageClassName: efs
   accessModes:
-  - ReadWriteOnce
+  - ReadWriteMany
   resources:
     requests:
       storage: {size}
