@@ -19,8 +19,12 @@ spec:
     additionalPrinterColumns:
     - name: SSH URI
       type: string
-      description: The SSH URI of the DevEnv
+      description: The SSH URI of the DevEnv.
       jsonPath: .status.create_update_dev_env.ssh
+    - name: Mounts enabled
+      type: string
+      description: Mount code volume to target pods.
+      jsonPath: .spec.mountsEnabled
     schema:
       openAPIV3Schema:
         type: object
@@ -89,6 +93,13 @@ spec:
                       type: boolean
                       description: Whether the volume should actually be mounted.
                       default: true
+              reloadSignal:
+                type: string
+                description: The UNIX signal required to force a reload of code and configuration in the target Deployment or Statefulset.
+                default: TERM
+                enum:
+                - TERM
+                - HUP
               excludedPaths:
                 type: array
                 description: Code paths to be excluded from rsync.

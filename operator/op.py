@@ -30,6 +30,7 @@ def create_update_dev_env(name, spec, namespace, logger, **kwargs):
     base_domain = spec["baseDomain"]
     excluded_paths = spec["excludedPaths"]
     mounts = spec["mounts"]
+    reload_signal = spec["reloadSignal"]
 
     # Interpolate all templates and apply idempotently using kubectl apply -f -
     _t = functools.partial(template_yaml, logger=logger, name=name)
@@ -37,12 +38,13 @@ def create_update_dev_env(name, spec, namespace, logger, **kwargs):
         _t("service-account.yaml"),
         _t("role.yaml"),
         _t("role-binding.yaml"),
-        _t("pvc.yaml", size=pvc_size),
+        _t("pvc.yaml", size=pvc_size, access_mode="ReadWriteMany", storage_class="efs"),
         _t(
             "deployment.yaml",
             image=image,
             ssh_keys="\n".join(ssh_keys),
             mounts=base64.b64encode(yaml.safe_dump(mounts).encode()).decode(),
+            reload_signal=reload_signal,
         ),
         _t("svc.yaml", base_domain=base_domain),
     ]
@@ -53,7 +55,7 @@ def create_update_dev_env(name, spec, namespace, logger, **kwargs):
     ssh_uri = f"docker@{name}.{base_domain}"
     base_repo_path = ""
     exclude_args = " ".join(f"--exclude={exc}" for exc in excluded_paths)
-    cmd = f"echo 'Starting rsync' && rsync -rlptzv --progress {exclude_args} `pwd`/{base_repo_path} {ssh_uri}:/home/docker/code && echo Reloading services && ssh {ssh_uri} -- './scripts/hup.sh' && echo Done"  # NOQA: E501
+    cmd = f"echo 'Starting rsync' && rsync -rlptzv --progress {exclude_args} `pwd`/{base_repo_path} {ssh_uri}:/home/docker/code && echo Reloading services && ssh {ssh_uri} -- './scripts/reload.sh' && echo Done"  # NOQA: E501
     return {"ssh": ssh_uri, "cmd": cmd}
 
 

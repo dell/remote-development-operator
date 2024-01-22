@@ -5,8 +5,9 @@ metadata:
   labels:
     app: {name}
 spec:
+  storageClassName: {storage_class}
   accessModes:
-  - ReadWriteOnce
+  - {access_mode}
   resources:
     requests:
       storage: {size}

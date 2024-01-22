@@ -40,6 +40,8 @@ spec:
           value: "{mounts}"
         - name: envname
           value: {name}
+        - name: reload_signal
+          value: {reload_signal}
         - name: namespace
           valueFrom:
             fieldRef:

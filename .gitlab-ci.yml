@@ -151,10 +151,10 @@ deploy devenv:
     cat example-dev-env.yaml | envsubst > dev-env.yaml
     cat dev-env.yaml
     kubectl apply -f dev-env.yaml
+    sleep 1
     echo
     echo
     echo "You can configure your local IDE to synchronize your local code over SSH. If using vscode/vscodium/code-server, please install the \`emeraldwalk.runonsave\` extension and put the following contents inside \`.vscode/settings.json\` within your project"
-    export CMD=$(kubectl get devenv -n $NAMESPACE $DEVENV_NAME -o json | jq ".status.create_update_dev_env.cmd")
     cat << EOF
     {
     "emeraldwalk.runonsave": {
@@ -162,7 +162,7 @@ deploy devenv:
             {
                 "match": ".*",
                 "isAsync": true,
-                "cmd": "$CMD"
+                "cmd": $(kubectl get devenv -n $NAMESPACE $DEVENV_NAME -o json | jq ".status.create_update_dev_env.cmd")
             }
         ]
       }
