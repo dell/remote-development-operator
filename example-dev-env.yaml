@@ -12,3 +12,5 @@ spec:
     mountPath: ${MOUNT_PATH}
     labels: ${LABELS}
   excludedPaths: ${EXCLUDED}
+  reloadSignal: ${RELOAD_SIGNAL}
+  postMountPodCmd: "${POST_MOUNT_POD_CMD}"

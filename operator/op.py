@@ -31,6 +31,7 @@ def create_update_dev_env(name, spec, namespace, logger, **kwargs):
     excluded_paths = spec["excludedPaths"]
     mounts = spec["mounts"]
     reload_signal = spec["reloadSignal"]
+    post_mount_pod_cmd = spec["postMountPodCmd"]
 
     # Interpolate all templates and apply idempotently using kubectl apply -f -
     _t = functools.partial(template_yaml, logger=logger, name=name)
@@ -45,6 +46,7 @@ def create_update_dev_env(name, spec, namespace, logger, **kwargs):
             ssh_keys="\n".join(ssh_keys),
             mounts=base64.b64encode(yaml.safe_dump(mounts).encode()).decode(),
             reload_signal=reload_signal,
+            post_mount_pod_cmd=post_mount_pod_cmd,
         ),
         _t("svc.yaml", base_domain=base_domain),
     ]
@@ -152,7 +154,7 @@ def add_mount(
     sub_path: str = "",
 ) -> None:
     # Configure volume.
-    volumes = manifest["spec"]["template"]["spec"]["volumes"]
+    volumes = manifest["spec"]["template"]["spec"].get("volumes", [])
     for volume in volumes:
         if volume["name"] == volume_name:
             # Update existing volume.
@@ -165,7 +167,7 @@ def add_mount(
         )
     # Configure volume mount.
     for container in manifest["spec"]["template"]["spec"]["containers"]:
-        mounts = container["volumeMounts"]
+        mounts = container.get("volumeMounts", [])
         for mount in mounts:
             if mount["name"] == volume_name:
                 # Update existing volume mount.
@@ -181,6 +183,7 @@ def add_mount(
             if sub_path:
                 mount["subPath"] = sub_path
             mounts.append(mount)
+            container["volumeMounts"] = mounts
 
 
 def remove_mount(*, manifest: dict, volume_name: str) -> None:
@@ -191,7 +194,7 @@ def remove_mount(*, manifest: dict, volume_name: str) -> None:
             volumes.pop(i)
     # Remove volume mount.
     for container in manifest["spec"]["template"]["spec"]["containers"]:
-        mounts = container["volumeMounts"]
+        mounts = container.get("volumeMounts", [])
         for i, mount in reversed(list(enumerate(mounts))):
             if mount["name"] == volume_name:
                 mounts.pop(i)

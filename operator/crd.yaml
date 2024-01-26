@@ -100,6 +100,10 @@ spec:
                 enum:
                 - TERM
                 - HUP
+              postMountPodCmd:
+                type: string
+                description: Command to be executed to target pods after mounting the code volume.
+                default: ''
               excludedPaths:
                 type: array
                 description: Code paths to be excluded from rsync.

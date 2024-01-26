@@ -39,6 +39,12 @@ variables:
   MOUNT_PATH:
     description: The path in the target pod were the code will be mounted at
     value: "/mist"
+  RELOAD_SIGNAL:
+    description: The Unix signal to send to the target pod to reload the code
+    value: "HUP"
+    options: ["TERM", "HUP"]
+  POST_MOUNT_POD_CMD:
+    description: The command to run after the target pod mounts the code
   EXCLUDED:
     description: Excluded paths
     value: '[".git", ".vscode", "__pycache__", ".pyc", "/landing", "/portal", "/jenkins", "/settings", "/ui", "/tests", "/docker/nginx/static"]'
@@ -140,6 +146,8 @@ deploy devenv:
     echo "Excluded:" $EXCLUDED
     echo "Mount path:" $MOUNT_PATH
     echo "Selectors:" $SELECTORS
+    echo "Reload signal:" $RELOAD_SIGNAL
+    echo "Post mount command:" $POST_MOUNT_POD_CMD
     curl https://gitlab.dell.com/$GITLAB_USER_LOGIN.keys > user.keys
     export GITHUB_USER_LOGIN=$(echo $GITLAB_USER_LOGIN|tr '_' '-')
     curl -L -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GITHUB_DELL_TOKEN}" https://eos2git.cec.lab.emc.com/api/v3/users/$GITHUB_USER_LOGIN/keys | jq -r '.[].key' >> user.keys
