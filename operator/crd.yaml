@@ -21,9 +21,13 @@ spec:
       type: string
       description: The SSH URI of the DevEnv.
       jsonPath: .status.create_update_dev_env.ssh
-    - name: Mounts enabled
+    - name: Mode
       type: string
-      description: Mount code volume to target pods.
+      description: Mode of operation.
+      jsonPath: .spec.mode
+    - name: Enabled
+      type: boolean
+      description: Code volume has been mounted to target pods.
       jsonPath: .spec.mountsEnabled
     schema:
       openAPIV3Schema:
@@ -53,9 +57,24 @@ spec:
                 type: string
                 description: Size of shared PVC to use for mounting of code.
                 default: 8Gi
+              mode:
+                type: string
+                description: Mode of operation. Can be one of `modify` or `clone`. Use `modify` to update the target resource in-place with the contents of the PVC. Use `clone` to create a new resource with the contents of the PVC and to expose it over HTTPS.
+                enum:
+                - modify
+                - clone
+                default: modify
               baseDomain:
                 type: string
                 description: Base domain name under which subdomains will be created for every environment.
+              albGroupName:
+                type: string
+                description: The ALB group that will be assigned to the ingress resource. Only applies to `clone` mode on EKS. See alb.ingress.kubernetes.io/group.name
+                default: "eoaas-development"
+              port:
+                type: integer
+                description: Port to expose when using `clone` mode.
+                default: 8080
               mountsEnabled:
                 type: boolean
                 description: Globally enable/disable all mounts under `mounts`.
@@ -63,7 +82,6 @@ spec:
               mounts:
                 type: array
                 description: A list of labels that select specific Deployments or Statefulsets along with a path to mount the PVC that contains the code or binary.
-                default: []  # why
                 items:
                   type: object
                   required:
@@ -77,7 +95,7 @@ spec:
                       description: The kind of target resource.
                       enum:
                       - deployment
-                      # - statefulset
+                      - statefulset
                     mountPath:
                       type: string
                       description: The path the PVC should be mounted on.

@@ -4,6 +4,7 @@ import base64
 import functools
 import os
 import subprocess
+from copy import deepcopy
 
 import kopf
 import yaml
@@ -25,6 +26,7 @@ def create_update_dev_env(name, spec, namespace, logger, **kwargs):
 
     # Parse configuration options.
     image = spec["image"]
+    kind = spec.get("kind", "deployment").capitalize()
     ssh_keys = spec["authorizedKeys"]
     pvc_size = spec["pvcSize"]
     base_domain = spec["baseDomain"]
@@ -36,19 +38,25 @@ def create_update_dev_env(name, spec, namespace, logger, **kwargs):
     # Interpolate all templates and apply idempotently using kubectl apply -f -
     _t = functools.partial(template_yaml, logger=logger, name=name)
     resources = [
-        _t("service-account.yaml"),
-        _t("role.yaml"),
-        _t("role-binding.yaml"),
-        _t("pvc.yaml", size=pvc_size, access_mode="ReadWriteMany", storage_class="efs"),
+        _t("templates/service-account.yaml"),
+        _t("templates/role.yaml"),
+        _t("templates/role-binding.yaml"),
         _t(
-            "deployment.yaml",
+            "templates/pvc.yaml",
+            size=pvc_size,
+            access_mode="ReadWriteMany",
+            storage_class="efs",
+        ),
+        _t(
+            "templates/resource.yaml",
             image=image,
             ssh_keys="\n".join(ssh_keys),
             mounts=base64.b64encode(yaml.safe_dump(mounts).encode()).decode(),
             reload_signal=reload_signal,
             post_mount_pod_cmd=post_mount_pod_cmd,
+            kind=kind,
         ),
-        _t("svc.yaml", base_domain=base_domain),
+        _t("templates/svc.yaml", base_domain=base_domain),
     ]
     kopf.adopt(resources)
     kubectl_apply(namespace=namespace, manifest=resources, logger=logger)
@@ -57,20 +65,46 @@ def create_update_dev_env(name, spec, namespace, logger, **kwargs):
     ssh_uri = f"docker@{name}.{base_domain}"
     base_repo_path = ""
     exclude_args = " ".join(f"--exclude={exc}" for exc in excluded_paths)
-    cmd = f"echo 'Starting rsync' && rsync -rlptzv --progress {exclude_args} `pwd`/{base_repo_path} {ssh_uri}:/home/docker/code && echo Reloading services && ssh {ssh_uri} -- './scripts/reload.sh' && echo Done"  # NOQA: E501
+    cmd = f"echo 'Starting rsync' && rsync -e 'ssh -o StrictHostKeyChecking=no' -rlptzv --progress {exclude_args} `pwd`/{base_repo_path} {ssh_uri}:/home/docker/code && echo Reloading services && ssh {ssh_uri} -- './scripts/reload.sh' && echo Done"  # NOQA: E501
     return {"ssh": ssh_uri, "cmd": cmd}
 
 
 @kopf.on.field("dell.com", "v1", "devenvs", field="spec.mountsEnabled")
 @kopf.on.field("dell.com", "v1", "devenvs", field="spec.mounts")
 def update_mounts(name, spec, namespace, logger, **kwargs):
+    """This handler will idempotently update the volume mounts."""
     del kwargs
     logger.info("Will idempotently update volume mounts.")
     for manifest, mounted, mount_path, sub_path in iter_mounts_and_manifests(
         namespace, spec["mounts"]
     ):
         m_kind, m_name = manifest["kind"], manifest["metadata"]["name"]
+
         if spec["mountsEnabled"] and mounted:
+            if spec.get("mode") == "clone":
+                _t = functools.partial(template_yaml, logger=logger, name=name)
+                base_domain = spec["baseDomain"]
+                port = spec["port"]
+                manifest = clone_manifest(manifest=manifest, new_name_postfix=name)
+                svc_manifest = _t(
+                    "templates/svc-http.yaml",
+                    name=manifest["metadata"]["name"],
+                    devenv=name,
+                    base_domain=base_domain,
+                    port=port,
+                )
+                ing_manifest = _t(
+                    "templates/ing.yaml",
+                    name=manifest["metadata"]["name"],
+                    base_domain=base_domain,
+                    port=port,
+                    group_name=spec.get("group", "default"),
+                )
+                logger.info("Idempotently cloning %s:%s", m_kind, m_name)
+                kubectl_apply(namespace=namespace, manifest=svc_manifest, logger=logger)
+                kubectl_apply(namespace=namespace, manifest=ing_manifest, logger=logger)
+            else:
+                logger.info("Idempotently mounting volume to %s:%s", m_kind, m_name)
             add_mount(
                 manifest=manifest,
                 volume_name=name,
@@ -78,11 +112,30 @@ def update_mounts(name, spec, namespace, logger, **kwargs):
                 mount_path=mount_path,
                 sub_path=sub_path,
             )
-            logger.info("Idempotently mounting volume to %s:%s", m_kind, m_name)
+            kubectl_apply(namespace=namespace, manifest=manifest, logger=logger)
         else:
-            remove_mount(manifest=manifest, volume_name=name)
-            logger.info("Idempotently unmounting volume to %s:%s", m_kind, m_name)
-        kubectl_apply(namespace=namespace, manifest=manifest, logger=logger)
+            if spec.get("mode") == "modify":
+                remove_mount(manifest=manifest, volume_name=name)
+                logger.info("Idempotently unmounting volume to %s:%s", m_kind, m_name)
+                kubectl_apply(namespace=namespace, manifest=manifest, logger=logger)
+            elif kubectl_get(namespace=namespace, kind=m_kind, labels={"devenv": name}):
+                resource_name = manifest["metadata"]["name"] + "-" + name
+                logger.info("Idempotently removing %s %s", m_kind, resource_name)
+                kubectl_delete(
+                    namespace=namespace, name=resource_name, kind=m_kind, logger=logger
+                )
+                kubectl_delete(
+                    namespace=namespace,
+                    name=resource_name,
+                    kind="service",
+                    logger=logger,
+                )
+                kubectl_delete(
+                    namespace=namespace,
+                    name=resource_name,
+                    kind="ingress",
+                    logger=logger,
+                )
 
 
 @kopf.on.delete("dell.com", "v1", "devenvs")
@@ -104,6 +157,36 @@ def template_yaml(filename, logger, **kwargs):
     data = yaml.safe_load(text)
     logger.debug("%s data:\n%s", filename, yaml.safe_dump(data))
     return data
+
+
+def clone_manifest(manifest, new_name_postfix):
+    new_manifest = deepcopy(manifest)
+    new_manifest["metadata"]["name"] += "-" + new_name_postfix
+    for key in [
+        "deployment.kubernetes.io/revision",
+        "kubectl.kubernetes.io/last-applied-configuration",
+    ]:
+        if key in new_manifest["metadata"]["annotations"]:
+            del new_manifest["metadata"]["annotations"][key]
+    for key in ["creationTimestamp", "generation", "resourceVersion", "uid"]:
+        if key in new_manifest["metadata"]:
+            del new_manifest["metadata"][key]
+    if "release" in new_manifest["metadata"]["labels"]:
+        del new_manifest["metadata"]["labels"]["release"]
+    new_manifest["spec"]["template"]["metadata"]["labels"] = {
+        "devenv": new_name_postfix
+    }
+    new_manifest["metadata"]["labels"] = {"devenv": new_name_postfix}
+    new_manifest["spec"]["selector"]["matchLabels"] = {"devenv": new_name_postfix}
+    new_manifest["spec"]["replicas"] = 1
+    del new_manifest["status"]
+    return new_manifest
+
+
+def kubectl_delete(namespace: str, name: str, kind: str, logger) -> None:
+    logger.debug("Will delete %s:\n%s", kind, name)
+    cmd = ["kubectl", "-n", namespace, "delete", kind, name]
+    subprocess.run(cmd, check=True, timeout=5)
 
 
 def kubectl_apply(namespace: str, manifest: str | dict | list, logger) -> None:

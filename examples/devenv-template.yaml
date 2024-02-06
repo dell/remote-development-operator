@@ -5,8 +5,10 @@ metadata:
   namespace: ${NAMESPACE}
 spec:
   mode: ${MODE}
+  port: ${PORT}
   image: ${IMAGE}
   baseDomain: ${BASE_DOMAIN}
+  albGroupName: ${GROUP_NAME}
   authorizedKeys: ${SSH_PUB_KEYS}
   mounts: ${MOUNTS}
   excludedPaths: ${EXCLUDED}
