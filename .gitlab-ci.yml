@@ -27,9 +27,10 @@ variables:
   # when a pipeline gets triggered.
   DEVENV_NAME:
     description: Name of the DevEnv that will be created.
+    value: ""
   EO_ENV:
     description: Name of the EO deployment that will be targeted
-    value: scheduled-test-env
+    value: ""
   NAMESPACE:
     description: Namespace where to deploy the DevEnv and look for the target services
     value: hzp
@@ -109,6 +110,10 @@ deploy operator:
   variables:
     GIT_STRATEGY: fetch
   stage: deploy operator
+  rules:
+    - if: $EO_ENV == ""
+      when: manual
+    - when: always
   script:
   - |-
     if [ -z "$EO_ENV" ]; then
@@ -130,17 +135,17 @@ deploy operator:
   - publish operator image to ECR
   - publish devenv image to ECR
 
-# Deploy operator.
+# Deploy devenv.
 deploy devenv:
   extends: .base
   variables:
     GIT_STRATEGY: fetch
   stage: deploy devenv
-  environment:
-    name: $DEVENV_NAME
   needs:
   - deploy operator
   rules:
+    - if: $EO_ENV == ""
+      when: manual
     - if: $DEVENV_NAME == ""
       when: manual
     - when: always
