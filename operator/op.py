@@ -75,9 +75,13 @@ def update_mounts(name, spec, namespace, logger, **kwargs):
     """This handler will idempotently update the volume mounts."""
     del kwargs
     logger.info("Will idempotently update volume mounts.")
-    for manifest, mounted, mount_path, sub_path in iter_mounts_and_manifests(
-        namespace, spec["mounts"]
-    ):
+    for (
+        manifest,
+        mounted,
+        mount_path,
+        sub_path,
+        entrypoints,
+    ) in iter_mounts_and_manifests(namespace, spec["mounts"]):
         m_kind, m_name = manifest["kind"], manifest["metadata"]["name"]
 
         if spec["mountsEnabled"] and mounted:
@@ -112,10 +116,12 @@ def update_mounts(name, spec, namespace, logger, **kwargs):
                 mount_path=mount_path,
                 sub_path=sub_path,
             )
+            update_entrypoints(manifest=manifest, entrypoints=entrypoints)
             kubectl_apply(namespace=namespace, manifest=manifest, logger=logger)
         else:
             if spec.get("mode") == "modify":
                 remove_mount(manifest=manifest, volume_name=name)
+                restore_entrypoints(manifest=manifest, entrypoints=entrypoints)
                 logger.info("Idempotently unmounting volume to %s:%s", m_kind, m_name)
                 kubectl_apply(namespace=namespace, manifest=manifest, logger=logger)
             elif kubectl_get(namespace=namespace, kind=m_kind, labels={"devenv": name}):
@@ -281,3 +287,20 @@ def remove_mount(*, manifest: dict, volume_name: str) -> None:
         for i, mount in reversed(list(enumerate(mounts))):
             if mount["name"] == volume_name:
                 mounts.pop(i)
+
+
+def update_entrypoints(*, manifest: dict, entrypoints: dict) -> None:
+    for container in manifest["spec"]["template"]["spec"]["containers"]:
+        entrypoint = entrypoints.get(container["name"])
+        if entrypoint is None:
+            continue
+        container["command"] = entrypoint
+
+
+def restore_entrypoints(*, manifest: dict, entrypoints: dict) -> None:
+    for container in manifest["spec"]["template"]["spec"]["containers"]:
+        entrypoint = entrypoints.get(container["name"])
+        if entrypoint is None:
+            continue
+        if container.get("command"):
+            del container["command"]
