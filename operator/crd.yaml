@@ -108,7 +108,7 @@ spec:
                       additionalProperties:
                         type: string
                     entrypoints:
-                      type: objects
+                      type: object
                       description: Override the entrypoint of specific containers in the target Deployment or Statefulset when mounting the code volume.
                       additionalProperties:
                         type: string

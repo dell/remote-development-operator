@@ -28,9 +28,9 @@ variables:
   DEVENV_NAME:
     description: Name of the DevEnv that will be created.
     value: ""
-  EO_ENV:
-    description: Name of the EO deployment that will be targeted
-    value: ""
+  APP_ENV:
+    description: Name of the app deployment that will be targeted
+    value: demo-eoaas
   NAMESPACE:
     description: Namespace where to deploy the DevEnv and look for the target services
     value: hzp
@@ -104,6 +104,16 @@ publish devenv image to ECR:
   script: copy_image $DEVENV_IMAGE_NAME:$CI_COMMIT_SHA
   needs: [build devenv image]
 
+publish images to dockerhub:
+  when: manual
+  stage: publish
+  script:
+  - docker tag $OPERATOR_IMAGE_NAME:$CI_COMMIT_SHA $DOCKERHUB_USER/$OPERATOR_IMAGE_NAME:$CI_COMMIT_SHA
+  - docker tag $DEVENV_IMAGE_NAME:$CI_COMMIT_SHA $DOCKERHUB_USER/$DEVENV_IMAGE_NAME:$CI_COMMIT_SHA
+  - docker push $DOCKERHUB_USER/$OPERATOR_IMAGE_NAME:$CI_COMMIT_SHA
+  - docker push $DOCKERHUB_USER/$DEVENV_IMAGE_NAME:$CI_COMMIT_SHA
+  needs: [build devenv image]
+
 # Deploy operator.
 deploy operator:
   extends: .base
@@ -111,16 +121,16 @@ deploy operator:
     GIT_STRATEGY: fetch
   stage: deploy operator
   rules:
-    - if: $EO_ENV == ""
+    - if: $APP_ENV == ""
       when: manual
     - when: always
   script:
   - |-
-    if [ -z "$EO_ENV" ]; then
+    if [ -z "$APP_ENV" ]; then
       echo "Deploying operator on host cluster"
     else
-      echo "Deploying operator inside $EO_ENV vcluster"
-      vcluster connect $EO_ENV
+      echo "Deploying operator inside $APP_ENV vcluster"
+      vcluster connect $APP_ENV
       sleep 5
     fi
     kubectl cluster-info
@@ -144,7 +154,7 @@ deploy devenv:
   needs:
   - deploy operator
   rules:
-    - if: $EO_ENV == ""
+    - if: $APP_ENV == ""
       when: manual
     - if: $DEVENV_NAME == ""
       when: manual
@@ -152,7 +162,7 @@ deploy devenv:
   script:
   - |-
     echo "Deploying DevEnv"
-    vcluster connect $EO_ENV
+    vcluster connect $APP_ENV
     echo "Connected to vcluster"
     kubectl cluster-info
     echo "Excluded:" $EXCLUDED
