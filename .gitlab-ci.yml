@@ -16,11 +16,11 @@ include:
 # Defines .base job template.
 - project: frontier/cloud-hosted-beta/eoaas-deployment-pipeline
   file: gitlab-ci-templates/base.gitlab-ci.yml
-  ref: usr/dr/gmtxm
+  ref: main
 # Defines .crane and .crane-copy-multi-image templates.
 - project: frontier/cloud-hosted-beta/eoaas-deployment-pipeline
   file: gitlab-ci-templates/crane.gitlab-ci.yml
-  ref: usr/dr/gmtxm
+  ref: main
 
 variables:
   # Variables with descriptions so that a nice form is generated in the Gitlab UI
@@ -28,33 +28,36 @@ variables:
   DEVENV_NAME:
     description: Name of the DevEnv that will be created.
     value: ""
-  EO_ENV:
-    description: Name of the EO deployment that will be targeted
+  APP_ENV:
+    description: Name of the app deployment that will be targeted.
     value: ""
   NAMESPACE:
-    description: Namespace where to deploy the DevEnv and look for the target services
-    value: hzp
+    description: Namespace where to deploy the DevEnv and look for the target services.
+    value: default
   SELECTORS:
-    description: Labels of target EO services to develop for
+    description: Labels of target EO services to develop for.
     value: app=api-v2
   MOUNT_PATH:
-    description: The path in the target pod were the code will be mounted at
+    description: The path in the target pod were the code will be mounted at.
     value: "/mist"
   MODE:
-    description: Choose if target pod should be modified or cloned
+    description: Choose if target pod should be modified or cloned.
     value: "modify"
     options: ["modify", "clone"]
   PORT:
-    description: The port of the target pod that should be exposed when using the clone mode
+    description: The port of the target pod that should be exposed when using the clone mode.
     value: "8080"
   RELOAD_SIGNAL:
-    description: The Unix signal to send to the target pod to reload the code
+    description: The Unix signal to send to the target pod to reload the code.
     value: "HUP"
     options: ["TERM", "HUP"]
+  RELOAD_CMD:
+    description: The command to run to target pods when reloading the code.
+    value: ""
   POST_MOUNT_POD_CMD:
-    description: The command to run after the target pod mounts the code
+    description: The command to run after the target pod mounts the code.
   EXCLUDED:
-    description: Excluded paths
+    description: Excluded paths.
     value: '[".git", ".vscode", "__pycache__", ".pyc", "/landing", "/portal", "/jenkins", "/settings", "/ui", "/tests", "/docker/nginx/static"]'
 
   # Remaining variables that will not be rendered in the Gitlab manual pipeline form.
@@ -111,16 +114,16 @@ deploy operator:
     GIT_STRATEGY: fetch
   stage: deploy operator
   rules:
-    - if: $EO_ENV == ""
+    - if: $APP_ENV == ""
       when: manual
     - when: always
   script:
   - |-
-    if [ -z "$EO_ENV" ]; then
+    if [ -z "$APP_ENV" ]; then
       echo "Deploying operator on host cluster"
     else
-      echo "Deploying operator inside $EO_ENV vcluster"
-      vcluster connect $EO_ENV
+      echo "Deploying operator inside $APP_ENV vcluster"
+      vcluster connect $APP_ENV
       sleep 5
     fi
     kubectl cluster-info
@@ -144,23 +147,28 @@ deploy devenv:
   needs:
   - deploy operator
   rules:
-    - if: $EO_ENV == ""
+    - if: $APP_ENV == ""
       when: manual
     - if: $DEVENV_NAME == ""
       when: manual
     - when: always
   script:
   - |-
-    echo "Deploying DevEnv"
-    vcluster connect $EO_ENV
-    echo "Connected to vcluster"
-    kubectl cluster-info
+    if [ -z "$APP_ENV" ]; then
+      echo "Deploying DevEnv on host cluster"
+    else
+      echo "Deploying DevEnv"
+      vcluster connect $APP_ENV
+      echo "Connected to vcluster"
+      kubectl cluster-info
+    fi
     echo "Excluded:" $EXCLUDED
     echo "Mount path:" $MOUNT_PATH
     echo "Selectors:" $SELECTORS
     echo "Mode:" $MODE
     echo "Port:" $PORT
     echo "Reload signal:" $RELOAD_SIGNAL
+    echo "Reload command:" $RELOAD_CMD
     echo "Post mount command:" $POST_MOUNT_POD_CMD
     curl https://gitlab.dell.com/$GITLAB_USER_LOGIN.keys > user.keys
     export GITHUB_USER_LOGIN=$(echo $GITLAB_USER_LOGIN|tr '_' '-')
@@ -170,6 +178,7 @@ deploy devenv:
     export MOUNTS=""
     export KIND="deployment"
     export GROUP_NAME="eoaas-development"
+    export ENTRYPOINTS="{}"
     for SELECTOR in $SELECTORS
         do
           export LABELS=$(echo $SELECTOR |sed -r 's/=/:\ /g'|sed -r 's/,/\n/g'|sed -r 's/^/      /g'|sed '1i\\')

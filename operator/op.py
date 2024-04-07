@@ -3,6 +3,7 @@
 import base64
 import functools
 import os
+import shlex
 import subprocess
 from copy import deepcopy
 
@@ -33,6 +34,7 @@ def create_update_dev_env(name, spec, namespace, logger, **kwargs):
     excluded_paths = spec["excludedPaths"]
     mounts = spec["mounts"]
     reload_signal = spec["reloadSignal"]
+    reload_cmd = spec["reloadCmd"]
     post_mount_pod_cmd = spec["postMountPodCmd"]
 
     # Interpolate all templates and apply idempotently using kubectl apply -f -
@@ -53,6 +55,7 @@ def create_update_dev_env(name, spec, namespace, logger, **kwargs):
             ssh_keys="\n".join(ssh_keys),
             mounts=base64.b64encode(yaml.safe_dump(mounts).encode()).decode(),
             reload_signal=reload_signal,
+            reload_cmd=reload_cmd,
             post_mount_pod_cmd=post_mount_pod_cmd,
             kind=kind,
         ),
@@ -148,7 +151,7 @@ def update_mounts(name, spec, namespace, logger, **kwargs):
 def cleanup_mounts(name, spec, namespace, logger, **kwargs):
     del kwargs
     logger.info("Clean up all volume mounts because dev env is being deleted.")
-    for manifest, _, _, _ in iter_mounts_and_manifests(namespace, spec["mounts"]):
+    for manifest, _, _, _, _ in iter_mounts_and_manifests(namespace, spec["mounts"]):
         remove_mount(manifest=manifest, volume_name=name)
         kubectl_apply(namespace=namespace, manifest=manifest, logger=logger)
 
@@ -219,7 +222,7 @@ def kubectl_get(namespace: str, kind: str, labels: dict[str, str]) -> list[dict]
 def iter_mounts_and_manifests(namespace, mounts):
     for mount in mounts:
         assert isinstance(mount, dict), repr(mount)
-        for attr in ("kind", "labels", "mountPath", "mounted"):
+        for attr in ("kind", "labels", "mountPath", "mounted", "entrypoints"):
             assert attr in mount, mount
         if mount["kind"].lower() != "deployment":
             raise NotImplementedError("Only deployments are supported.")
@@ -231,6 +234,7 @@ def iter_mounts_and_manifests(namespace, mounts):
                 mount["mounted"],
                 mount["mountPath"],
                 mount.get("subPath", ""),
+                mount["entrypoints"],
             )
 
 
@@ -294,7 +298,9 @@ def update_entrypoints(*, manifest: dict, entrypoints: dict) -> None:
         entrypoint = entrypoints.get(container["name"])
         if entrypoint is None:
             continue
-        container["command"] = entrypoint
+        cmd = shlex.split(entrypoint)
+        container["command"] = [cmd[0]]
+        container["args"] = cmd[1:]
 
 
 def restore_entrypoints(*, manifest: dict, entrypoints: dict) -> None:
@@ -304,3 +310,4 @@ def restore_entrypoints(*, manifest: dict, entrypoints: dict) -> None:
             continue
         if container.get("command"):
             del container["command"]
+            del container["args"]

@@ -1,9 +1,35 @@
 #!/bin/bash
 
 # Send reload signal to target pods.
-for pod in `kubectl get po -lapp=api-v2 -o name`
+export pods=$(python -d <<EOF
+import os
+import yaml
+import base64
+import subprocess
+
+mounts = base64.b64decode(os.getenv('mounts'))
+mounts_yaml = f"""mounts:
+{mounts.decode()}"""
+mounts_obj = yaml.safe_load(mounts)
+
+for mount in mounts_obj:
+    labels = mount['labels']
+    labels_str = ",".join("=".join((key, val)) for key, val in labels.items())
+    print(subprocess.check_output(['kubectl','get','po',f"-l{labels_str}",'-o','name']).decode('utf-8'))
+EOF
+)
+
+for pod in $pods
 do
+    echo $pod
     kubectl exec -it $pod -- kill -$reload_signal 1
+    if [ -z "$reload_cmd" ]; then
+        # No reload command to be executed inside the pod.
+        echo
+    else
+        echo "Executing reload command inside $pod: $reload_cmd"
+        kubectl exec -it $pod -- $reload_cmd
+    fi
     echo "Reloading $pod"
 done
 
@@ -17,7 +43,7 @@ else
         echo "No post mount command to be executed inside the pods"
     else
         echo "Executing post mount command inside each pod"
-        for pod in `kubectl get po -lapp=api-v2 -o name`
+        for pod in $pods
         do
             echo kubectl exec -it $pod -- $post_mount_pod_cmd
             kubectl exec -it $pod -- $post_mount_pod_cmd
