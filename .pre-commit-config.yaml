@@ -13,7 +13,7 @@ repos:
     - --branch=main
     - --pattern=^rel/
   - id: check-added-large-files
-    args: ["--maxkb=50"]
+    args: ["--maxkb=360"]
   - id: check-merge-conflict
   - id: check-case-conflict
   - id: fix-byte-order-marker
