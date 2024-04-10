@@ -79,16 +79,16 @@ build operator image:
   extends: .docker_build  # from included template
   stage: build
   variables:
-    EXT_REGISTRY: $ARTIFACTORY_REGISTRY
+    EXT_REGISTRY: $ARTIFACTORY_LOCAL_REGISTRY
     EXT_REGISTRY_USER: $ARTIFACTORY_DOCKER_PUSH_USER  # Taken from project settings
     EXT_REGISTRY_PASSWORD: $ARTIFACTORY_DOCKER_PUSH_PASSWORD  # Taken from project settings
-    EXT_REGISTRY_IMAGE: $ARTIFACTORY_REGISTRY/$OPERATOR_IMAGE_NAME
+    EXT_REGISTRY_IMAGE: $ARTIFACTORY_LOCAL_REGISTRY/$OPERATOR_IMAGE_NAME
   script: docker_simple_build_and_push
   needs: []
 build devenv image:
   extends: build operator image
   variables:
-    EXT_REGISTRY_IMAGE: $ARTIFACTORY_REGISTRY/$DEVENV_IMAGE_NAME
+    EXT_REGISTRY_IMAGE: $ARTIFACTORY_LOCAL_REGISTRY/$DEVENV_IMAGE_NAME
   script: docker_simple_build_and_push devenv
 
 # Publish docker images to ECR.
