@@ -4,7 +4,7 @@ RUN useradd -ms /bin/bash $USER
 ENV HOME /home/$USER
 USER root
 # RUN adduser $USER
-RUN apt-get update && apt-get install jq curl fuse sudo sed apt-utils vim openssh-server gzip git rsync -y
+RUN apt-get update && apt-get install jq curl fuse sudo sed apt-utils vim openssh-server gzip git rsync bash-completion -y
 RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl && \
       chmod +x ./kubectl && \
       mv ./kubectl /usr/local/bin/kubectl && \

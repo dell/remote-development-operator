@@ -13,4 +13,5 @@ spec:
   mounts: ${MOUNTS}
   excludedPaths: ${EXCLUDED}
   reloadSignal: ${RELOAD_SIGNAL}
+  reloadCmd: "${RELOAD_CMD}"
   postMountPodCmd: "${POST_MOUNT_POD_CMD}"

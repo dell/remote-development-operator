@@ -1,6 +1,8 @@
 # Remote Development Operator
 
-The Remote Development Operator, is a Kubernetes operator and CRD for deploying remote development environments. It has been developed within Dell ISG Edge, to facilitate the development efforts of __[Dell NativeEdge](https://www.dell.com/en-us/dt/solutions/edge-computing/edge-platform.htm)__, the edge operations platform. The Remote Development Operator can be leveraged to facilitate the development of any software project that can be deployed on Kubernetes.
+The Remote Development Operator, is a Kubernetes operator and Custom Resource Definition (CRD) for deploying remote development environments. It has been developed within Dell ISG Edge, to facilitate the development efforts of __[Dell NativeEdge](https://www.dell.com/en-us/dt/solutions/edge-computing/edge-platform.htm)__, the edge operations platform. The Remote Development Operator can be leveraged to facilitate the development of any software project that can be deployed on Kubernetes.
+
+<img src="Operator.png" />
 
 ## Table of Contents
 
@@ -12,11 +14,20 @@ The Remote Development Operator, is a Kubernetes operator and CRD for deploying 
 - [License](#license)
 
 # Features
-The CRD, defines a new Kubernetes resource named __DevEnv__. Each __DevEnv__ can target one or more k8s deployments or statefulsets using label selectors. For each __DevEnv__, the operator creates a DNS record, a PVC for storing the code or binaries, and starts an SSH server, configured to accept the specified SSH keypairs. Each __DevEnv__, provides a command that can be used to configure the end user's IDE (e.g. VSCode). This configuration will synchronize over SSH the local code that's stored on the developer's device to the PVC that's attached to the __DevEnv__ pod. After the first sync is complete, the __DevEnv__ gets enabled and mounts the code PVC to the target pods.
+We define a new Kubernetes custom resource named __DevEnv__. Each __DevEnv__ can target one or more k8s deployments or statefulsets using label selectors. For each __DevEnv__, the operator creates a DNS record, a PVC for storing the code or binaries, and starts an SSH server, configured to accept the specified SSH keypairs. Each __DevEnv__, provides a command that can be used to configure the end user's IDE (e.g. VSCode). This configuration will synchronize over SSH the local code that's stored on the developer's device to the PVC that's attached to the __DevEnv__ pod. After the first sync is complete, the __DevEnv__ gets enabled and mounts the code PVC to the target pods.
 
 There are two supported modes of operation.
-- In `modify` mode the operator will edit the definition of the target deployments or statefulsets, mounting the code PVC on the target path, which will override the original code that's burned into the image.
-- In `clone` mode the operator will launch a new deployment or statefulset, with the PVC mounted on the target path, while leaving the original deployment or statefulset untouched. A new service and ingress is also generated, to expose a port of the cloned deployment over HTTPS.
+### Modify mode
+
+<img src="modify-mode.svg" width="600" />
+
+In `modify` mode the operator will edit the definition of the target deployments or statefulsets, mounting the code PVC on the target path, which will override the original code that's burned into the image.
+
+## Clone mode
+
+<img src="clone-mode.svg" width="600" />
+
+In `clone` mode the operator will launch a new deployment or statefulset, with the PVC mounted on the target path, while leaving the original deployment or statefulset untouched. A new service and ingress is also generated, to expose a port of the cloned deployment over HTTPS.
 
 When working on a large application that consists of numerous microservices, the `clone` mode allows multiple developers to work in parallel, leveraging the same deployed application. There may still be cases were the cloned devenv may affect the original application, e.g. when working on DB schema changes. Developers that leverage the `clone` mode should coordinate with the peers to ensure they're not breaking their development environments. When in doubt, `modify` is the safest option, however it mostly requires a dedicated application deployment for each developer.
 
@@ -50,6 +61,7 @@ Once the operator is installed, you can start creating DevEnvs. Copy examples/de
 | mounts | A list of mounts |
 | excludedPaths | The repository paths to be excluded from syncing. |
 | reloadSignal | The UNIX signal that will force the target resource to reload its code. Can be `TERM` or `HUP`. |
+| reloadCmd | A command to run on the pod of the target resource when reloading the code. |
 | postMountPodCmd | A command to run on the pod of the target resource after mounting the code PVC. |
 ||
 

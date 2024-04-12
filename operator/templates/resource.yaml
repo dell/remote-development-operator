@@ -42,6 +42,8 @@ spec:
           value: {name}
         - name: reload_signal
           value: {reload_signal}
+        - name: reload_cmd
+          value: {reload_cmd}
         - name: post_mount_pod_cmd
           value: {post_mount_pod_cmd}
         - name: namespace

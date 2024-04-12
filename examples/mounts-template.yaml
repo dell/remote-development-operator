@@ -1,3 +1,6 @@
   - kind: ${KIND}
     mountPath: ${MOUNT_PATH}
+    subPath: ${SUB_PATH}
     labels: ${LABELS}
+    entrypoints:
+      ${ENTRYPOINTS}
