@@ -1,4 +1,5 @@
-FROM isgedge.artifactory.cec.lab.emc.com/isgedge-docker-virtual/python:3.11-slim-bookworm
+FROM python:3.11-slim-bookworm
+LABEL org.opencontainers.image.source="https://github.com/dell/remote-development-operator"
 
 # Install kubectl.
 RUN set -x && \
