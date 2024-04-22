@@ -8,6 +8,14 @@ on:
     branches: [ "main" ]
 
 jobs:
+  pre-commit:
+    runs-on: self-hosted
+    steps:
+      - name: Run pre-commit
+        run: |
+          pip install pre-commit
+          pre-commit install-hooks
+          pre-commit run -a --color=always --show-diff-on-failure
   build_operator_image:
     runs-on: self-hosted
     steps:
@@ -25,7 +33,7 @@ jobs:
         if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
           TAG=latest
         else
-          TAG=$(echo ${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}| tr / -)
+          TAG=$(echo ${GITHUB_HEAD_REF:-${GITHUB_REF#refs/tags/}}| tr / -)
         fi
         docker build . --file Dockerfile --tag ghcr.io/dell/remote-development-operator:$TAG
         docker push ghcr.io/dell/remote-development-operator:$TAG
@@ -46,7 +54,7 @@ jobs:
        if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
           TAG=latest
         else
-          TAG=$(echo ${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}| tr / -)
+          TAG=$(echo ${GITHUB_HEAD_REF:-${GITHUB_REF#refs/tags/}}| tr / -)
         fi
         docker build . --file Dockerfile --tag ghcr.io/dell/remote-development-operator/devenv:$TAG
         docker push ghcr.io/dell/remote-development-operator/devenv:$TAG
