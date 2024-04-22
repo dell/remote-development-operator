@@ -8,6 +8,14 @@ on:
     branches: [ "main" ]
 
 jobs:
+  pre-commit:
+    runs-on: self-hosted
+    steps:
+      - name: Run pre-commit
+        run: |
+          pip install pre-commit
+          pre-commit install-hooks
+          pre-commit run -a --color=always --show-diff-on-failure
   build_operator_image:
     runs-on: self-hosted
     steps:
