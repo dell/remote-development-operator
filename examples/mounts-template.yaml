@@ -4,3 +4,5 @@
     labels: ${LABELS}
     entrypoints:
       ${ENTRYPOINTS}
+    images:
+      ${IMAGES}
