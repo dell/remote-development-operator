@@ -78,12 +78,14 @@ def update_mounts(name, spec, namespace, logger, **kwargs):
     """This handler will idempotently update the volume mounts."""
     del kwargs
     logger.info("Will idempotently update volume mounts.")
+    # import ipdb;ipdb.set_trace()
     for (
         manifest,
         mounted,
         mount_path,
         sub_path,
         entrypoints,
+        images,
     ) in iter_mounts_and_manifests(namespace, spec["mounts"]):
         m_kind, m_name = manifest["kind"], manifest["metadata"]["name"]
 
@@ -120,11 +122,13 @@ def update_mounts(name, spec, namespace, logger, **kwargs):
                 sub_path=sub_path,
             )
             update_entrypoints(manifest=manifest, entrypoints=entrypoints)
+            update_images(manifest=manifest, images=images)
             kubectl_apply(namespace=namespace, manifest=manifest, logger=logger)
         else:
             if spec.get("mode") == "modify":
                 remove_mount(manifest=manifest, volume_name=name)
                 restore_entrypoints(manifest=manifest, entrypoints=entrypoints)
+                restore_images(manifest=manifest)
                 logger.info("Idempotently unmounting volume to %s:%s", m_kind, m_name)
                 kubectl_apply(namespace=namespace, manifest=manifest, logger=logger)
             elif kubectl_get(namespace=namespace, kind=m_kind, labels={"devenv": name}):
@@ -222,7 +226,7 @@ def kubectl_get(namespace: str, kind: str, labels: dict[str, str]) -> list[dict]
 def iter_mounts_and_manifests(namespace, mounts):
     for mount in mounts:
         assert isinstance(mount, dict), repr(mount)
-        for attr in ("kind", "labels", "mountPath", "mounted", "entrypoints"):
+        for attr in ("kind", "labels", "mountPath", "mounted", "entrypoints", "images"):
             assert attr in mount, mount
         if mount["kind"].lower() != "deployment":
             raise NotImplementedError("Only deployments are supported.")
@@ -235,6 +239,7 @@ def iter_mounts_and_manifests(namespace, mounts):
                 mount["mountPath"],
                 mount.get("subPath", ""),
                 mount["entrypoints"],
+                mount["images"],
             )
 
 
@@ -258,6 +263,7 @@ def add_mount(
         volumes.append(
             {"name": volume_name, "persistentVolumeClaim": {"claimName": pvc_name}}
         )
+        manifest["spec"]["template"]["spec"]["volumes"] = volumes
     # Configure volume mount.
     for container in manifest["spec"]["template"]["spec"]["containers"]:
         mounts = container.get("volumeMounts", [])
@@ -281,7 +287,7 @@ def add_mount(
 
 def remove_mount(*, manifest: dict, volume_name: str) -> None:
     # Remove volume.
-    volumes = manifest["spec"]["template"]["spec"]["volumes"]
+    volumes = manifest["spec"]["template"]["spec"].get("volumes", [])
     for i, volume in reversed(list(enumerate(volumes))):
         if volume["name"] == volume_name:
             volumes.pop(i)
@@ -311,3 +317,26 @@ def restore_entrypoints(*, manifest: dict, entrypoints: dict) -> None:
         if container.get("command"):
             del container["command"]
             del container["args"]
+
+
+def update_images(*, manifest: dict, images: dict) -> None:
+    for container in manifest["spec"]["template"]["spec"]["containers"]:
+        image = images.get(container["name"])
+        if image is None:
+            continue
+        manifest["metadata"]["annotations"][
+            f"devenv.dell.com/{container['name']}"
+        ] = container["image"]
+        container["image"] = image
+
+
+def restore_images(*, manifest: dict) -> None:
+    for container in manifest["spec"]["template"]["spec"]["containers"]:
+        image = manifest["metadata"]["annotations"].get(
+            f"devenv.dell.com/{container['name']}"
+        )
+        if image:
+            container["image"] = image
+            del manifest["metadata"]["annotations"][
+                f"devenv.dell.com/{container['name']}"
+            ]
